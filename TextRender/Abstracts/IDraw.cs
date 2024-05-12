@@ -12,7 +12,9 @@ namespace TextRender.Abstracts
         IFontProvider FontProvider { get; }
         FontInfo CurrentFontInfo { get; }
         string CurrentFontKey { get; set; }
+        float MeasureText(char c, string? fontKey=null);
         float MeasureText(ReadOnlySpan<char> text, string? fontKey=null);
+        void DrawText(char c,float X=0.0F,float Y=0.0F, string? fontKey=null);
         void DrawText(ReadOnlySpan<char> text,float X=0.0F,float Y=0.0F, string? fontKey=null);
         void Clear(uint? color=null);
     }

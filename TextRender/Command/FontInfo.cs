@@ -13,22 +13,22 @@ namespace TextRender.Command
         /// <summary>
         /// 获取或设置字体的大小。
         /// </summary>
-        public float Size { get; set; }
+        public float Size { get; set; } = 12;
 
         /// <summary>
         /// 获取或设置字体在X轴上的倾斜度。
         /// </summary>
         public float SkewX { get; set; }
 
-        /// <summary>
-        /// 获取或设置字体的字符间距。
-        /// </summary>
+        ///// <summary>
+        ///// 获取或设置字体的字符间距。
+        ///// </summary>
         public float Spacing { get; set; }
 
         /// <summary>
         /// 获取或设置字体在X轴上的缩放。
         /// </summary>
-        public float ScaleX { get; set; }
+        public float ScaleX { get; set; } = 1;
 
         ///// <summary>
         ///// 获取或设置字体的权重。

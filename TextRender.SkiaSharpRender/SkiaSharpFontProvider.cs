@@ -173,23 +173,24 @@ namespace TextRender.SkiaSharpRender
             var font = GetFont(fontKey);
             var paint = GetPaint(fontKey);
 
-            font.Typeface=SKTypeface.FromFamilyName(newFontInfo.FamilyName);
-            font.Size=newFontInfo.Size;
-            font.SkewX=newFontInfo.SkewX;
-            font.ScaleX=newFontInfo.ScaleX;
-            font.Embolden=newFontInfo.Embolden;
+            font?.Typeface?.Dispose();
+            font?.Dispose();
+            paint?.Typeface?.Dispose();
+            paint?.Dispose();
 
+            font=new SKFont(SKTypeface.FromFamilyName(newFontInfo.FamilyName), newFontInfo.Size, newFontInfo.ScaleX, newFontInfo.SkewX);
+            font.Embolden=newFontInfo.Embolden;
+            paint=new SKPaint(font);
             paint.Color=_colorParse.ToColor(newFontInfo.Color);
             paint.TextAlign=(SKTextAlign)newFontInfo.Align;
-            paint.TextSize=newFontInfo.Size;
-            paint.TextSkewX=newFontInfo.SkewX;
-            paint.TextScaleX=newFontInfo.ScaleX;
             paint.IsAntialias=newFontInfo.IsAntialias;
             paint.IsAutohinted=newFontInfo.IsAutohinted;
             paint.IsLinearText=newFontInfo.IsLinearText;
             paint.IsStroke=newFontInfo.IsStroke;
             paint.Style=SKPaintStyle.Fill;
-            paint.Typeface=SKTypeface.FromFamilyName(newFontInfo.FamilyName);
+
+            _fonts[fontKey]=font;
+            _paints[fontKey]=paint;
 
             return true;
         }

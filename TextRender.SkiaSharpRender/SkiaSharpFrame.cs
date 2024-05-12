@@ -26,6 +26,7 @@ namespace TextRender.SkiaSharpRender
             _imageInfo=new SKImageInfo(0, 0);
             _bitmap=new SKBitmap();
             _canvas=new SKCanvas(_bitmap);
+            _fontProvider=new SkiaSharpFontProvider(this);
         }
         
         public int Width

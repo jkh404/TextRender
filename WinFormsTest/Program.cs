@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace WinFormsTest
@@ -11,6 +12,7 @@ namespace WinFormsTest
         static void Main()
         {
 
+            
             // To customize application configuration such as set high DPI settings or default font,
             // see https://aka.ms/applicationconfiguration.
             var EncodingProvider=CodePagesEncodingProvider.Instance;

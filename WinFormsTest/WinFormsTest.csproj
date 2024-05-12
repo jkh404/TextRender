@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\TextRender.SkiaSharpRender\TextRender.SkiaSharpRender.csproj" />
     <ProjectReference Include="..\TextRender\TextRender.csproj" />
   </ItemGroup>
 

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace TextRender
@@ -8,7 +9,10 @@ namespace TextRender
     /// </summary>
     public partial class TextFrame : IDisposable
     {
-        public ReadDataLock CreateReadDataLock() => new ReadDataLock(this);
+        public ReadDataLock CreateReadDataLock()
+        {
+            return new ReadDataLock(this);
+        }
         public struct ReadDataLock : IDisposable
         {
             private bool _disposed;
@@ -24,9 +28,10 @@ namespace TextRender
 
             public ReadDataLock(TextFrame textFrame)
             {
+                if (!Monitor.TryEnter(textFrame._lockAlloc, 2000)) throw new InvalidOperationException();
                 _disposed=false;
                 _textFrame = textFrame;
-                Monitor.Enter(_textFrame._lockAlloc);
+                
             }
 
             public void UnLock()

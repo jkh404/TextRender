@@ -7,8 +7,10 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using SkiaSharp;
 using TextRender;
+using TextRender.Abstracts;
 using UtfUnknown;
-
+using TextRender.SkiaSharpRender;
+using TextRender.Command;
 
 namespace WinFormsTest
 {
@@ -29,10 +31,11 @@ namespace WinFormsTest
         private TextFrame textFrame;
         private Bitmap bitmap;
 
-        private string[] FamilyNames = ["SimSum-ExtB","楷体","隶书","幼圆","等线", "微软雅黑", "华文新魏","黑体"];
+        private string[] FamilyNames = ["黑体","华文新魏", "幼圆", "等线", "隶书", "楷体", "微软雅黑", "SimSum-ExtB"];
         private int curFamilyName;
         public Form1()
         {
+            
 
             AutoScaleMode = AutoScaleMode.None;
             ClientSize = new Size(width, height);
@@ -51,23 +54,31 @@ namespace WinFormsTest
             bitmap=new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
             using var reader = new StreamReader(filePath, result.Detected.Encoding);
             text=reader.ReadToEnd();
-            textFrame = new TextFrame(width, height);
+            var g = GraphicInstances.Instance.CreateSkiaSharpFrame();
+            textFrame = new TextFrame(g, width, height);
+            foreach (var item in FamilyNames)
+            {
+                g.FontProvider.LoadFont(new FontInfo
+                {
+                    Color=Colors.Black,
+                    Size=20,
+                    FamilyName=item,
+                    FontStyle=TextRender.Command.FontStyle.Fill,
+                    Spacing=0
+                }, item);
+            }
+            textFrame.CurrentFontkey=FamilyNames[0];
             textFrame.PageMarginLeft=0;
             textFrame.PageMarginTop=10;
             textFrame.PageMarginBottom=10;
             textFrame.PageMarginRight=0;
-            
-            textFrame.Alloc();
-            textFrame.InitFont(20, "#FF000000", (fontDic) =>
-            {
-                int i = 0;
-                foreach (var item in FamilyNames)
-                {
-                    fontDic.AddFromFamilyName(i++, item);
-                }
-            });
-            //textFrame.InitText(text[0..2000]);
+            //textFrame.InitText(text[0..4000]);
             textFrame.InitText(text);
+            textFrame.Alloc();
+
+            
+            //textFrame.InitText(text[0..2000]);
+
             //textFrame.Invoke(t =>
             //{
 
@@ -164,6 +175,7 @@ namespace WinFormsTest
             //{
             //    Debug.WriteLine(ex);
             //}
+            bool isBack = false;
             while (Visible && bufferedGraphics!=null)
             {
                 lock (renderLockObj)
@@ -172,23 +184,36 @@ namespace WinFormsTest
                     if (gh==null) continue;
                     stopwatch.Restart();
                     gh.Clear(System.Drawing.Color.White);
-                    //textFrame.PageMarginTop=10;
+                    //textFrame.PageMarginTop-=0.1F;
+                    Action<TextFrame> action = t =>
+                    {
+                        if(!isBack) t.MoveLineDisplay(10000);
+                        else t.MoveLineDisplay(-10000);
+                    };
+                    this.textFrame.Invoke(action);
+
                     textFrame.Render();
                     textFrame.CopyTo(bitmap);
 
                     gh.DrawImage(bitmap, 0, 0);
+                    var jindu = textFrame.DisplayRange.End/(textFrame.TextLength*1D)*100;
                     TextRenderer.DrawText(gh, $"FPS:{Fps:N2}", textFont, Point.Empty, System.Drawing.Color.Black);
-                    
+                    TextRenderer.DrawText(gh, $"滚动进度:{jindu:N2}%", textFont, new Point(100,0), System.Drawing.Color.Black);
+                    if (jindu>95)
+                    {
+                        isBack=true;
+                    }
                     //TextRenderer.DrawText($"{}");
 
                     if (tickTime/10000.0>17)
                     {
                         tickTime=0;
 
-                        bufferedGraphics?.Render();
+                        //bufferedGraphics?.Render();
 
                     }
-                    //bufferedGraphics?.Render();
+                    
+                    bufferedGraphics?.Render();
                     stopwatch.Stop();
                     drawTime =stopwatch.ElapsedTicks;
                     tickTime+=drawTime;
@@ -306,7 +331,7 @@ namespace WinFormsTest
                 //t.CurrentFontkey=FamilyNames[curFamilyName%FamilyNames.Length];
                 //t.PageMarginTop+=e.Delta/100;
 
-                t.MoveDisplayLine(e.Delta<0 ? 1 : -1);
+                t.MoveLineDisplay(e.Delta<0 ? 1 : -1);
             };
             this.textFrame.Invoke(action);
             curFamilyName++;
