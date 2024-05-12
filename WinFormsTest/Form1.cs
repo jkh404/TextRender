@@ -60,12 +60,14 @@ namespace WinFormsTest
             textFrame.Alloc();
             textFrame.InitFont(20, "#FF000000", (fontDic) =>
             {
+                int i = 0;
                 foreach (var item in FamilyNames)
                 {
-                    fontDic.AddFromFamilyName(item, item);
+                    fontDic.AddFromFamilyName(i++, item);
                 }
             });
-            textFrame.InitText(text[0..2000]);
+            //textFrame.InitText(text[0..2000]);
+            textFrame.InitText(text);
             //textFrame.Invoke(t =>
             //{
 
@@ -86,11 +88,10 @@ namespace WinFormsTest
                 if (bitmap!=null) bitmap?.Dispose();
                 if (textFrame!=null)
                 {
-                    textFrame.Free();
+
                     textFrame.Invoke(t =>
                     {
-                        t.Width=width;
-                        t.Height=height;
+                        t.Resize(width,height);
                         //t.FixUpText();
                         //t.InitAlloc();
                     });
@@ -171,13 +172,13 @@ namespace WinFormsTest
                     if (gh==null) continue;
                     stopwatch.Restart();
                     gh.Clear(System.Drawing.Color.White);
-
+                    //textFrame.PageMarginTop=10;
                     textFrame.Render();
                     textFrame.CopyTo(bitmap);
 
                     gh.DrawImage(bitmap, 0, 0);
                     TextRenderer.DrawText(gh, $"FPS:{Fps:N2}", textFont, Point.Empty, System.Drawing.Color.Black);
-
+                    
                     //TextRenderer.DrawText($"{}");
 
                     if (tickTime/10000.0>17)
@@ -299,11 +300,13 @@ namespace WinFormsTest
 
             Action<TextFrame> action = t =>
             {
-                //t.DefaultFontSize+=e.Delta/100.0F;
+                //t.FontSize+=e.Delta/100.0F;
 
-                t.MoveDisplayStart(e.Delta<0 ? 1 : -1);
+                //t.MoveDisplayStart(e.Delta<0 ? 1 : -1);
                 //t.CurrentFontkey=FamilyNames[curFamilyName%FamilyNames.Length];
                 //t.PageMarginTop+=e.Delta/100;
+
+                t.MoveDisplayLine(e.Delta<0 ? 1 : -1);
             };
             this.textFrame.Invoke(action);
             curFamilyName++;
