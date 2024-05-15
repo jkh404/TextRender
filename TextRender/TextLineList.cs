@@ -26,7 +26,7 @@ namespace TextRender
             get
             {
                 var height = 0;
-                Monitor.Enter(_lockList);
+                if(!Monitor.TryEnter(_lockList,1000))throw new InvalidOperationException();
                 foreach (var item in TextLines)
                 {
                     height+=item.LineHeight;
@@ -44,7 +44,7 @@ namespace TextRender
             get
             {
                 var maxWidth = 0;
-                Monitor.Enter(_lockList);
+                if(!Monitor.TryEnter(_lockList, 1000))throw new InvalidOperationException();
                 foreach (var item in TextLines)
                 {
                     var lineW = item.LineWidth;
@@ -57,61 +57,82 @@ namespace TextRender
 
         public void Add(ref TextLine textLine)
         {
+            
             Monitor.Enter(_lockList);
-            if (_textLines == null) throw new InvalidOperationException();
-            if (_capacity==_count)
+            try
             {
+                if (_textLines == null) throw new InvalidOperationException();
+                if (_capacity==_count)
+                {
 
-                var _tempTextLines = ArrayPool<TextLine>.Shared.Rent(_capacity*=2);
-                _textLines.AsSpan(0, _count).CopyTo(_tempTextLines.AsSpan(0, _count));
-                ArrayPool<TextLine>.Shared.Return(_textLines, true);
-                _textLines=_tempTextLines;
+                    var _tempTextLines = ArrayPool<TextLine>.Shared.Rent(_capacity*=2);
+                    _textLines.AsSpan(0, _count).CopyTo(_tempTextLines.AsSpan(0, _count));
+                    ArrayPool<TextLine>.Shared.Return(_textLines, true);
+                    _textLines=_tempTextLines;
+                }
+                _textLines[_count++]=textLine;
             }
-            _textLines[_count++]=textLine;
-            Monitor.Exit(_lockList);
+            finally
+            {
+                Monitor.Exit(_lockList);
+            }
+            
         }
         internal ref TextLine GenerateReturn()
         {
             Monitor.Enter(_lockList);
-            if (_textLines == null) throw new InvalidOperationException();
-            if (_capacity==_count)
+            try
+            {
+                if (_textLines == null) throw new InvalidOperationException();
+                if (_capacity==_count)
+                {
+
+                    var _tempTextLines = ArrayPool<TextLine>.Shared.Rent(_capacity*=2);
+                    _textLines.AsSpan(0, _count).CopyTo(_tempTextLines.AsSpan(0, _count));
+                    ArrayPool<TextLine>.Shared.Return(_textLines, true);
+                    _textLines=_tempTextLines;
+                }
+                ref TextLine TextLine = ref _textLines[_count++];
+                TextLine.Init(_source, _sourceLength);
+                return ref TextLine;
+            }
+            finally
             {
 
-                var _tempTextLines = ArrayPool<TextLine>.Shared.Rent(_capacity*=2);
-                _textLines.AsSpan(0, _count).CopyTo(_tempTextLines.AsSpan(0, _count));
-                ArrayPool<TextLine>.Shared.Return(_textLines, true);
-                _textLines=_tempTextLines;
+                Monitor.Exit(_lockList);
             }
-            ref TextLine TextLine =ref _textLines[_count++];
-            TextLine.Init(_source,_sourceLength);
-            Monitor.Exit(_lockList);
-            return ref TextLine;
+            
         }
         public void Clear()
         {
             Monitor.Enter(_lockList);
-            foreach (var item in TextLines)
-            {
-                item.Clear();
-            }
-            _count =0;
-            Monitor.Exit(_lockList);
-        }
-        private void Release()
-        {
-            Monitor.Enter(_lockList);
-            if (_textLines != null && _textLines.Length>0)
+            try
             {
                 foreach (var item in TextLines)
                 {
                     item.Clear();
                 }
                 _count =0;
-                ArrayPool<TextLine>.Shared.Return(_textLines);
-                _textLines=null;
-                _capacity=0;
-            }
-            Monitor.Exit(_lockList);
+            }finally { Monitor.Exit(_lockList); }
+            
+        }
+        private void Release()
+        {
+            Monitor.Enter(_lockList);
+            try
+            {
+                if (_textLines != null && _textLines.Length>0)
+                {
+                    foreach (var item in TextLines)
+                    {
+                        item.Clear();
+                    }
+                    _count =0;
+                    ArrayPool<TextLine>.Shared.Return(_textLines);
+                    _textLines=null;
+                    _capacity=0;
+                }
+            }finally { Monitor.Exit(_lockList); }
         }
         public void Dispose()
         {

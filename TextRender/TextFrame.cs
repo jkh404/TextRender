@@ -16,7 +16,7 @@ namespace TextRender
     /// <summary>
     /// 文本渲染片段
     /// </summary>
-    public  partial class TextFrame : IDisposable
+    public  partial class TextFrame : IBox,IDisposable
     {
 
         public TextFrame(IGraphic graphic, int? width = null, int? height = null)
@@ -36,12 +36,13 @@ namespace TextRender
         private object _lockTextBuffer = new object();
         private bool _initOk;
         private RenderFinished? _onRenderFinished;
-        private Margin _lineMargin=new Margin();
-        private Margin _pageMargin = new Margin();
+        private BoxSpacing _lineMargin=new BoxSpacing();
+        private BoxSpacing _pageMargin = new BoxSpacing();
         //private string _text=string.Empty;
+        private BoxInfo _box;
 
-       
-        
+
+
 
         private ConcurrentStack<int> _lineLenStack = new ConcurrentStack<int>();
         private static readonly int NewLineLen = Environment.NewLine.Length;
@@ -197,6 +198,10 @@ namespace TextRender
             }
         }
 
+        public BoxInfo? ParentBox => null;
+
+        public BoxInfo Box => _box;
+
         //protected TextFrame(IGraphic graphic)
         //{
         //    if (graphic==null) throw new ArgumentNullException(nameof(graphic));
@@ -311,8 +316,12 @@ namespace TextRender
         }
         public void ReleaseText()
         {
-            _pinGCTextBuffer?.Dispose();
-            _pinGCTextBuffer=null;
+            lock (_lockRender)
+            {
+
+                _pinGCTextBuffer?.Dispose();
+                _pinGCTextBuffer=null;
+            }
         }
         public bool MoveStartDisplay(int num)
         {
@@ -332,9 +341,16 @@ namespace TextRender
         }
         public bool JumpToDisplay(double rate)
         {
-            if (rate<0) return false;
-            if(rate>1)return false;
-
+            if (rate<0) rate=0;
+            if(rate>1) rate=1;
+            var textLen = Text.Length;
+            var _start=Convert.ToInt32(Math.Ceiling(rate*textLen));
+            var _end=textLen;
+            _textDisplayRange.SetStartAndEnd(_start, _end);
+            var result = FixupText();
+            _end=_start+result;
+            _textDisplayRange.SetStartAndEnd(_start, _end);
+            return true;
         }
         public bool MoveLineDisplay(int LineCount)
         {
@@ -343,28 +359,58 @@ namespace TextRender
             LineCount=Math.Abs(LineCount);
             if (this._textLineList.Count>0 && dy>0)
             {
-                using var dataLock = _textLineList.GetData();
-                var aLLLen = 0;
-                for (int i = 0; i < Math.Min(LineCount, dataLock.Datas.Length); i++)
+                var dataLock = _textLineList.GetData();
+                try
                 {
-                    var len = dataLock.Datas[i].Range.Length;
-                    _lineLenStack.Push(len);
-                    aLLLen+=len;
+                    var lineCount = dataLock.Datas.Length;
+                    LineCount= Math.Min(LineCount, lineCount);
+                    var aLLLen = 0;
+                    for (int i = 0; i < LineCount; i++)
+                    {
+                        var len = dataLock.Datas[i].Range.Length;
+                        _lineLenStack.Push(len);
+                        aLLLen+=len;
+                    }
+                    return MoveStartDisplay(aLLLen);
                 }
-                return MoveStartDisplay(aLLLen);
+                catch (Exception)
+                {
+
+                    throw;
+                }
+                finally
+                {
+                    dataLock.Dispose();
+                }
+
 
             }
             else if (dy<0 && _lineLenStack.Count>0)
             {
-                using var dataLock = _textLineList.GetData();
-                var aLLLen = 0;
-                for (int i = 0; i < Math.Min(LineCount, dataLock.Datas.Length); i++)
+                var dataLock = _textLineList.GetData();
+                try
                 {
-                    _lineLenStack.TryPop(out var len);
-                    aLLLen+=len;
+                    var lineCount = dataLock.Datas.Length;
+                    LineCount= Math.Min(LineCount, lineCount);
+                    var aLLLen = 0;
+                    for (int i = 0; i <LineCount; i++)
+                    {
+                        _lineLenStack.TryPop(out var len);
+                        aLLLen+=len;
 
+                    }
+                    return MoveStartDisplay(-aLLLen);
                 }
-                return MoveStartDisplay(-aLLLen);
+                catch (Exception)
+                {
+
+                    throw;
+                }
+                finally
+                {
+                    dataLock.Dispose();
+                }
+                
                 //if (_lineLenStack.TryPeek(out var len) && MoveDisplayStart(-len))
                 //{
                 //    int i = 0;
@@ -574,7 +620,10 @@ namespace TextRender
                 if (!_initOk) return;
                 if (_actionQueue!=null && _actionQueue.Count>0)
                 {
-
+                    //using Timer timer = new Timer((state) =>
+                    //{
+                    //    Debug.WriteLine("执行超时");
+                    //},null,1000,1000);
                     var queueCount = _actionQueue.Count;
                     var len = Math.Min(_invokeTask.Length, queueCount);
                     do
@@ -583,11 +632,14 @@ namespace TextRender
                         {
                             if (_actionQueue.TryDequeue(out var action))
                             {
-                                if (action!=null) _invokeTask[tIndex]=Task.Run(() =>
-                                {
-                                    action?.Invoke(this);
-                                });
-                                else _invokeTask[tIndex]=Task.CompletedTask;
+                                //if (action!=null) _invokeTask[tIndex]=Task.Run(() =>
+                                //{
+                                //    Debug.WriteLine($"S:{action}");
+                                //    action?.Invoke(this);
+                                //    Debug.WriteLine($"E:{action}");
+                                //});
+                                //else _invokeTask[tIndex]=Task.CompletedTask;
+                                action?.Invoke(this);
                             }
                             else
                             {
@@ -595,12 +647,22 @@ namespace TextRender
                             }
                         }
 
-                        for (int tIndex = 0; tIndex < len; tIndex++)
-                        {
-                            _invokeTask[tIndex].Wait();
-                        }
+                        //for (int tIndex = 0; tIndex < len; tIndex++)
+                        //{
+                        //    try
+                        //    {
+
+                        //        _invokeTask[tIndex].Wait(1000);
+                        //    }
+                        //    catch (Exception)
+                        //    {
+
+                        //        throw;
+                        //    }
+                        //}
                         len=queueCount-len;
                     } while (len>0);
+                    
                 }
 
                 if (NextFixupText)
@@ -658,19 +720,22 @@ namespace TextRender
 
         public void Invoke(Action<TextFrame> action)
         {
-
-            if (action!=null)
+            lock (_lockRender)
             {
-                const int MAX_INVOKE_TRY = 10;
-                int i = 0;
-                while (_actionQueue.Count>100)
+                if (action!=null)
                 {
-                    if (i>MAX_INVOKE_TRY) return;
-                    Thread.Sleep(100);
-                    i++;
+                    const int MAX_INVOKE_TRY = 10;
+                    int i = 0;
+                    while (_actionQueue.Count>100)
+                    {
+                        if (i>MAX_INVOKE_TRY) return;
+                        Thread.Sleep(100);
+                        i++;
+                    }
+                    _actionQueue.Enqueue(action);
                 }
-                _actionQueue.Enqueue(action);
             }
+            
         }
         public bool CopyTo(Span<byte> target,out Range range)
         {

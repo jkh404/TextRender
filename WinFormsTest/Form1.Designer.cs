@@ -28,13 +28,25 @@
         /// </summary>
         private void InitializeComponent()
         {
+            vScrollBar1 = new VScrollBar();
             SuspendLayout();
+            // 
+            // vScrollBar1
+            // 
+            vScrollBar1.LargeChange = 1;
+            vScrollBar1.Location = new Point(777, 9);
+            vScrollBar1.Maximum = 10000;
+            vScrollBar1.Name = "vScrollBar1";
+            vScrollBar1.Size = new Size(23, 432);
+            vScrollBar1.TabIndex = 0;
+            vScrollBar1.Scroll += vScrollBar1_Scroll;
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 17F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(800, 450);
+            Controls.Add(vScrollBar1);
             Name = "Form1";
             Text = "Form1";
             FormClosing += Form1_FormClosing;
@@ -43,5 +55,7 @@
         }
 
         #endregion
+
+        private VScrollBar vScrollBar1;
     }
 }

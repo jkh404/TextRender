@@ -28,6 +28,7 @@ namespace TextRender
             _textBufferGCHandle.Free();
             _textBuffer=IntPtr.Zero;
             Monitor.Exit(_lockTextBuffer);
+            GC.Collect();
         }
     }
 }

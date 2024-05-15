@@ -12,12 +12,12 @@ namespace TextRender
         private float _MaxWidth;
         private float _MaxHeight;
         internal float PageMaxWidth;
-        public Margin Margin;
+        public BoxSpacing Margin;
         public TextRange Range;
 
         private TextItem[] _TextItems;
         private int  _ItemCount;
-        internal TextLine(IntPtr source,int sourceLength, Margin margin,float pageMaxWidth, ReadOnlySpan<TextItem> textItems)
+        internal TextLine(IntPtr source,int sourceLength, BoxSpacing margin,float pageMaxWidth, ReadOnlySpan<TextItem> textItems)
         {
             if (textItems==null || textItems.Length<=0) throw new ArgumentException(nameof(textItems));
             _Source=source;
@@ -97,13 +97,13 @@ namespace TextRender
             }
         }
 
-        public unsafe static TextItem CreateItem(IntPtr source,int sourceLength, TextRange textRange, Margin margin,FontInfo fontInfo, byte[] widthMultiple)
+        public unsafe static TextItem CreateItem(IntPtr source,int sourceLength, TextRange textRange, BoxSpacing margin,FontInfo fontInfo, byte[] widthMultiple)
         {
 
             TextItem textItem=new TextItem(source, sourceLength, textRange, margin, fontInfo, widthMultiple,null,0);
             return  textItem;
         }
-        public unsafe static TextItem CreateItem(IntPtr source, int sourceLength,  Margin margin, byte[] bitmap, int bitmapWidth)
+        public unsafe static TextItem CreateItem(IntPtr source, int sourceLength,  BoxSpacing margin, byte[] bitmap, int bitmapWidth)
         {
             if (bitmap==null || bitmap.Length==0 || bitmapWidth==0 || bitmap.Length%(bitmapWidth*4)>0) throw new ArgumentException();
             TextItem textItem = new TextItem(source, sourceLength, new TextRange(0,0), margin, null, null, bitmap, bitmapWidth);

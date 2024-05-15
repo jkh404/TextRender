@@ -1,16 +1,11 @@
 ﻿using System.Diagnostics;
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
-using System.IO;
-using System.Numerics;
-using System.Runtime.CompilerServices;
-using SkiaSharp;
 using TextRender;
 using TextRender.Abstracts;
 using UtfUnknown;
 using TextRender.SkiaSharpRender;
 using TextRender.Command;
+using System.Text;
+using System.Runtime;
 
 namespace WinFormsTest
 {
@@ -24,36 +19,89 @@ namespace WinFormsTest
 
         private int width = 1920;
         private int height = 1080;
-        private readonly string filePath = "《恶灵国度》作者：弹指一笑间0.txt";
+        //private readonly string filePath = "《恶灵国度》作者：弹指一笑间0.txt";
+        private readonly string filePath = "《恶灵国度》作者：弹指一笑间0_make.txt";
 
-        private readonly string text;
+        //private readonly string text;
         private object renderLockObj = new object();
         private TextFrame textFrame;
         private Bitmap bitmap;
 
-        private string[] FamilyNames = ["黑体","华文新魏", "幼圆", "等线", "隶书", "楷体", "微软雅黑", "SimSum-ExtB"];
+        private string[] FamilyNames = ["黑体", "华文新魏", "幼圆", "等线", "隶书", "楷体", "微软雅黑", "SimSum-ExtB"];
         private int curFamilyName;
         public Form1()
         {
-            
+
+            InitializeComponent();
+            //using var read = File.OpenRead(filePath);
+            //using var write = File.OpenWrite("《恶灵国度》作者：弹指一笑间0_make.txt");
+            //for (int i = 0; i < 100; i++)
+            //{
+            //    read.CopyTo(write);
+            //    read.Seek(0, SeekOrigin.Begin);
+
+            //}
+            //write.Flush();
+
 
             AutoScaleMode = AutoScaleMode.None;
             ClientSize = new Size(width, height);
+            this.vScrollBar1.Location=new Point(this.ClientSize.Width-this.vScrollBar1.Width, 0);
+            this.vScrollBar1.Height=this.ClientSize.Height;
+
             this.Text=$"{this.ClientSize.Width}×{this.ClientSize.Height}";
             this.SetStyle(ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw|ControlStyles.AllPaintingInWmPaint, true);
             this.Resize+=Form1_Resize;
             graphics=this.CreateGraphics();
             bufferedGraphicsContext = new BufferedGraphicsContext();
             bufferedGraphics =bufferedGraphicsContext.Allocate(graphics, this.ClientRectangle);
-            
+
             this.FormClosing+=Form1_FormClosing;
             this.MouseWheel+=Form1_MouseWheel;
             this.MouseDown+=Form1_MouseDown; ;
             DetectionResult result = CharsetDetector.DetectFromFile(filePath);
 
             bitmap=new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-            using var reader = new StreamReader(filePath, result.Detected.Encoding);
-            text=reader.ReadToEnd();
+
+            //for (int i = 0; i < 10; i++)
+            //{
+            //    var path = filePath;
+            //    var encoding = result.Detected.Encoding;
+            //    using (var reader = new StreamReader(path, encoding))
+            //    {
+            //        var text=reader.ReadToEnd();
+            //    }
+            //}
+            //var text = "";
+            var path = filePath;
+            var encoding = result.Detected.Encoding;
+
+
+
+
+            using var reader = new StreamReader(path, encoding);
+            var text=reader.ReadToEnd();
+
+
+
+
+
+            //var byteArr = File.ReadAllBytes(path);
+            //byteArr=null;
+
+
+            //encoding.GetCharCount()
+            //text=null;
+
+            //GC.Collect(2, GCCollectionMode.Optimized);
+
+
+            //for (int i = 0; i < 10000000; i++)
+            //{
+            //    var test = $"{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}{i}";
+            //}
+
+
             var g = GraphicInstances.Instance.CreateSkiaSharpFrame();
             textFrame = new TextFrame(g, width, height);
             foreach (var item in FamilyNames)
@@ -71,12 +119,27 @@ namespace WinFormsTest
             textFrame.PageMarginLeft=0;
             textFrame.PageMarginTop=10;
             textFrame.PageMarginBottom=10;
-            textFrame.PageMarginRight=0;
+            textFrame.PageMarginRight=this.vScrollBar1.Width;
             //textFrame.InitText(text[0..4000]);
             textFrame.InitText(text);
             textFrame.Alloc();
 
-            
+            //for (int i = 0; i < 10; i++)
+            //{
+            //    GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+            //    Thread.Sleep(1000);
+            //    GC.Collect();
+
+            //}
+
+            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+            GCSettings.LatencyMode=GCLatencyMode.LowLatency;
+            GC.Collect();
+            Thread.Sleep(1000);
+            GC.Collect();
+
+
+
             //textFrame.InitText(text[0..2000]);
 
             //textFrame.Invoke(t =>
@@ -92,8 +155,11 @@ namespace WinFormsTest
         {
             lock (renderLockObj)
             {
+
                 width=this.ClientSize.Width;
                 height=this.ClientSize.Height;
+                this.vScrollBar1.Location=new Point(this.ClientSize.Width-this.vScrollBar1.Width, 0);
+                this.vScrollBar1.Height=this.ClientSize.Height;
                 if (bufferedGraphics!=null) bufferedGraphics?.Dispose();
 
                 if (bitmap!=null) bitmap?.Dispose();
@@ -102,7 +168,7 @@ namespace WinFormsTest
 
                     textFrame.Invoke(t =>
                     {
-                        t.Resize(width,height);
+                        t.Resize(width, height);
                         //t.FixUpText();
                         //t.InitAlloc();
                     });
@@ -129,6 +195,8 @@ namespace WinFormsTest
                 var Milliseconds = drawTime/10000.0;
                 if (Milliseconds==0) Milliseconds=1;
                 Fps =(Fps+(1000/Milliseconds))/2;
+                drawTime+=1000*10000.0;
+                if (Fps<10) Debug.WriteLine("渲染卡顿");
             }, null, 0, 1000);
 
 
@@ -176,6 +244,7 @@ namespace WinFormsTest
             //    Debug.WriteLine(ex);
             //}
             bool isBack = false;
+            double jindu2 = 0;
             while (Visible && bufferedGraphics!=null)
             {
                 lock (renderLockObj)
@@ -187,18 +256,21 @@ namespace WinFormsTest
                     //textFrame.PageMarginTop-=0.1F;
                     Action<TextFrame> action = t =>
                     {
-                        if(!isBack) t.MoveLineDisplay(10000);
-                        else t.MoveLineDisplay(-10000);
-                    };
-                    this.textFrame.Invoke(action);
+                        //if (!isBack) t.JumpToDisplay(jindu2+=0.01);
+                        //else t.JumpToDisplay(jindu2-=0.01);
 
-                    textFrame.Render();
-                    textFrame.CopyTo(bitmap);
+                        if(gunjindu>=0) t.JumpToDisplay(gunjindu);
+                        this.gunjindu=-1;
+                    };
+                    this.textFrame?.Invoke(action);
+
+                    textFrame?.Render();
+                    textFrame?.CopyTo(bitmap);
 
                     gh.DrawImage(bitmap, 0, 0);
-                    var jindu = textFrame.DisplayRange.End/(textFrame.TextLength*1D)*100;
+                    var jindu = textFrame?.DisplayRange.End/(textFrame?.TextLength*1D)*100;
                     TextRenderer.DrawText(gh, $"FPS:{Fps:N2}", textFont, Point.Empty, System.Drawing.Color.Black);
-                    TextRenderer.DrawText(gh, $"滚动进度:{jindu:N2}%", textFont, new Point(100,0), System.Drawing.Color.Black);
+                    TextRenderer.DrawText(gh, $"滚动进度:{jindu:N2}%", textFont, new Point(100, 0), System.Drawing.Color.Black);
                     if (jindu>95)
                     {
                         isBack=true;
@@ -212,7 +284,7 @@ namespace WinFormsTest
                         //bufferedGraphics?.Render();
 
                     }
-                    
+
                     bufferedGraphics?.Render();
                     stopwatch.Stop();
                     drawTime =stopwatch.ElapsedTicks;
@@ -333,7 +405,7 @@ namespace WinFormsTest
 
                 t.MoveLineDisplay(e.Delta<0 ? 1 : -1);
             };
-            this.textFrame.Invoke(action);
+            this.textFrame?.Invoke(action);
             curFamilyName++;
 
         }
@@ -352,6 +424,14 @@ namespace WinFormsTest
             //        Thread.Sleep(20);
             //    }
             //}
+            //textFrame?.Dispose();
+            //textFrame =null;
+        }
+        double gunjindu = 0;
+        private void vScrollBar1_Scroll(object sender, ScrollEventArgs e)
+        {
+            gunjindu=this.vScrollBar1.Value/(this.vScrollBar1.Maximum*1.0D);
+
         }
     }
 }

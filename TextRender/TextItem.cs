@@ -10,7 +10,7 @@ namespace TextRender
         internal int _SourceLength;
         internal TextRange _Range;
         internal float _ContentWidth;
-        public Margin _Margin;
+        public BoxSpacing _Margin;
 
         public FontInfo FontInfo;
         public byte[] WidthMultiple;
@@ -21,7 +21,7 @@ namespace TextRender
             IntPtr source,
             int sourceLength,
             TextRange textRange,
-            Margin margin,
+            BoxSpacing margin,
             FontInfo fontInfo,
             ReadOnlySpan<byte> widthMultiple, byte[] bitmap, int bitmapWidth)
         {
@@ -43,7 +43,7 @@ namespace TextRender
         private unsafe Span<char> SourceText => new Span<char>((void*)_Source, _SourceLength);
         private unsafe ReadOnlySpan<char> ReadOnlySourceText => SourceText;
         public unsafe ReadOnlySpan<char> Text => ReadOnlySourceText[_Range.AsRange()];
-        public Margin Margin => _Margin;
+        public BoxSpacing Margin => _Margin;
         public TextRange Range => _Range;
         public float FontSize => FontInfo.Size;
         public float Spacing => FontInfo.Spacing;
