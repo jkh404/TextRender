@@ -7,78 +7,12 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TextRender.Command;
 using TextRender.Handles.Abstracts;
 
 namespace TextRender.Handles
 {
-    public class BitList:IDisposable
-    {
-
-        private byte[] _array;
-        private int _arrayLength=100;
-        public int Capacity => _arrayLength*8;
-
-        private int LastIndex = 0;
-        public BitList()
-        {
-            _array=ArrayPool<byte>.Shared.Rent(_arrayLength);
-            Array.Clear(_array,0, _arrayLength);
-        }
-        public BitList(int length)
-        {
-
-            _arrayLength=Convert.ToInt32(Math.Ceiling(length/8.0D));
-            _array =ArrayPool<byte>.Shared.Rent(_arrayLength);
-            Array.Clear(_array, 0, _arrayLength);
-           
-        }
-        public bool this[int index]
-        {
-            get
-            {
-                if(index<0 || index>Capacity)throw new ArgumentOutOfRangeException(nameof(index));
-                var i = index/8;
-                var offset= index%8;
-                return (_array[i] & (1<<offset))!=0;
-            }
-            set
-            {
-                if (index<0 || index>Capacity) throw new ArgumentOutOfRangeException(nameof(index));
-                var i = index/8;
-                var offset= index%8;
-                if (value)
-                {
-                    _array[i]|=(byte)(1<<offset);
-                    if (LastIndex<index) LastIndex=index;
-                }
-                else
-                {
-                    _array[i]&=(byte)~(1<<offset);
-                }
-
-            }
-        }
-        public void Dispose()
-        {
-            if(_array!=null) ArrayPool<byte>.Shared.Return(_array);
-        }
-        public void FixUp()
-        {
-            
-            var newArrLength=Convert.ToInt32(Math.Ceiling(LastIndex/8.0D));
-            if (newArrLength>0 && newArrLength<_arrayLength)
-            {
-
-                var _temp = ArrayPool<byte>.Shared.Rent(newArrLength);
-                Array.Copy(_array, _temp, newArrLength);
-                ArrayPool<byte>.Shared.Return(_array);
-                _array=_temp;
-                _arrayLength=newArrLength;
-            }
-
-        }
-    }
-    public class TextProviderHandle : ITextProviderHandle,IDisposable
+    public class TextProviderHandle : ITextProviderHandle
     {
         private readonly Task<CountInfo> _taskCountChar;
         private readonly StreamWapper _stream;
@@ -86,13 +20,19 @@ namespace TextRender.Handles
         private readonly long _byteCount;
         private long _charCount;
         private CountInfo _countInfo;
-
+        private bool _isReadOnly;
+        private bool _isCountLine;
+        private bool _isCache;
+        private int _newLineByteCount;
+        private readonly string _newLine="\n";
         public TextProviderHandle(Stream stream, Encoding? encoding=null)
         {
             
             _stream =new StreamWapper(stream);
             _byteCount=_stream.Length;
             _encoding =encoding??Encoding.Unicode;
+            _newLineByteCount=_encoding.GetByteCount(_newLine);
+            _isCountLine =true;
             _taskCountChar=Task.Run(CountTask);
         }
         public ReadOnlySpan<char> this[Range range]
@@ -105,15 +45,17 @@ namespace TextRender.Handles
         private CountInfo CountTask()
         {
             CountInfo countInfo = new CountInfo();
-
             const int OneMB = 1024*1024;
             int ReadOneMB = _encoding.GetMaxByteCount(1)*OneMB;
             const int SingleReadMax = int.MaxValue-102400;
             long countChar = 0;
             long byteCount = ByteCount;
             long startRead = 0;
-            BitList bitList = new BitList((int)Math.Min(byteCount, SingleReadMax));
-            byte[] newLineBytes= _encoding.GetBytes("\n");
+            List<long> newLineIndex=null;
+            if(IsCountLine) newLineIndex=new List<long>(Convert.ToInt32(Math.Min(byteCount*0.01, SingleReadMax*0.01)));
+            List<long> newLineIndexTemp = new List<long>();
+            long lineCount = 0;
+            byte[] newLineBytes= _encoding.GetBytes(_newLine);
             do
             {
                 int readCount = 0;
@@ -130,22 +72,24 @@ namespace TextRender.Handles
                 long startReadTemp = 0;
                 do
                 {
-                    throw new NotImplementedException("统计行数，还未实现");
                     var buffer = ArrayPool<byte>.Shared.Rent(ReadOneMB);
                     var count = _stream.Read(buffer, startRead, ReadOneMB);
                     countChar+=_encoding.GetCharCount(buffer.AsSpan(0, count));
+                    newLineIndexTemp.Clear();
+                    lineCount+=(buffer.AsSpan(0, count).IndexOfALL(newLineBytes, newLineIndexTemp, startReadTemp));
                     startReadTemp+=count;
-                    var isNewLine=buffer.AsSpan(0, count).IndexOf(newLineBytes);
-                    
                     ArrayPool<byte>.Shared.Return(buffer,true);
+                    if (IsCountLine) newLineIndex?.AddRange(newLineIndexTemp);
 
                 } while (readCount>startReadTemp);
                 startRead+=startReadTemp;
             } while (byteCount>0);
             countInfo.CharCount=countChar;
             _countInfo = countInfo;
-            bitList.FixUp();
-            _countInfo.LineIndexs=bitList;
+            _countInfo.LineCount=lineCount;
+            _countInfo.LineIndexs=newLineIndex;
+            newLineIndexTemp.Clear();
+            newLineIndexTemp.Capacity=0;
             return countInfo;
         }
 
@@ -153,13 +97,35 @@ namespace TextRender.Handles
         public bool CountRunning => !_taskCountChar.IsCompleted;
         public long Count => _taskCountChar.Result.CharCount;
         public long LineCount => _taskCountChar.Result.LineCount;
-        public IEnumerable<Range> Lines => throw new NotImplementedException();
+        public bool IsCountLine => _isCountLine;
+        public bool IsCache => _isCache;
+        public IEnumerable<Range> Lines
+        {
+            get
+            {
+                if (IsCountLine)
+                {
+
+                    long start = 0;
+                    foreach (var index in _taskCountChar!.Result!.LineIndexs!)
+                    {
+                        yield return new Range((int)start, (int)index);
+                        start=index+_newLineByteCount;
+                    }
+                }
+                else
+                {
+                    throw new NotSupportedException();
+                }
+            }
+        }
 
         public Encoding Encoding => _encoding;
 
-        public bool IsReadOnly => throw new NotImplementedException();
+        public bool IsReadOnly => _isReadOnly;
 
-        public bool IsEmpty => throw new NotImplementedException();
+
+        public string NewLine => _newLine;
 
         public void CopyTo(ReadOnlySpan<char> chars, long offset = 0)
         {
@@ -201,11 +167,28 @@ namespace TextRender.Handles
         {
             _stream?.Dispose(); 
         }
+
+        public ReadOnlySpan<byte> SliceByte(long start, int length)
+        {
+
+            byte[] buffer = new byte[length];
+            _stream.Read(buffer, start, length);
+            return buffer;
+        }
+
+        public ReadOnlySpan<byte> SliceByte(long start)
+        {
+            int length = (int)(ByteCount-start);
+            byte[] buffer=new byte[length];
+            _stream.Read(buffer, start, length);
+            return buffer;
+        }
+
         private class  CountInfo
         {
             public long CharCount { get; set;}
             public long LineCount { get; set; }
-            public BitList LineIndexs { get; set; }
+            public List<long>? LineIndexs { get; set; }
 
             //public CountInfo(long charCount, long lenCount, BitArray lineIndex)
             //{
