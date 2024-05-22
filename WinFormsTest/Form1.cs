@@ -6,6 +6,7 @@ using TextRender.SkiaSharpRender;
 using TextRender.Command;
 using System.Text;
 using System.Runtime;
+using TextRender.Handles;
 
 namespace WinFormsTest
 {
@@ -20,7 +21,8 @@ namespace WinFormsTest
         private int width = 1920;
         private int height = 1080;
         //private readonly string filePath = "《恶灵国度》作者：弹指一笑间0.txt";
-        private readonly string filePath = "《恶灵国度》作者：弹指一笑间0_make.txt";
+        //private readonly string filePath = "《恶灵国度》作者：弹指一笑间0_make.txt";
+        private readonly string filePath = "big.txt";
 
         //private readonly string text;
         private object renderLockObj = new object();
@@ -79,8 +81,8 @@ namespace WinFormsTest
 
 
 
-            using var reader = new StreamReader(path, encoding);
-            var text=reader.ReadToEnd();
+            var reader = new StreamReader(path, encoding);
+            //var text=reader.ReadToEnd();
 
 
 
@@ -103,7 +105,7 @@ namespace WinFormsTest
 
 
             var g = GraphicInstances.Instance.CreateSkiaSharpFrame();
-            textFrame = new TextFrame(g, width, height);
+            textFrame = new TextFrame(g, new TextProviderHandle(reader.BaseStream, encoding),width, height);
             foreach (var item in FamilyNames)
             {
                 g.FontProvider.LoadFont(new FontInfo
@@ -121,22 +123,22 @@ namespace WinFormsTest
             textFrame.PageMarginBottom=10;
             textFrame.PageMarginRight=this.vScrollBar1.Width;
             //textFrame.InitText(text[0..4000]);
-            textFrame.InitText(text);
+            textFrame.InitText();
             textFrame.Alloc();
 
             //for (int i = 0; i < 10; i++)
             //{
             //    GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            //    Thread.Sleep(1000);
+            //    Thread.Sleep(100);
             //    GC.Collect();
 
             //}
 
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GCSettings.LatencyMode=GCLatencyMode.LowLatency;
-            GC.Collect();
-            Thread.Sleep(1000);
-            GC.Collect();
+            //GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+            //GCSettings.LatencyMode=GCLatencyMode.LowLatency;
+            //GC.Collect();
+            //Thread.Sleep(1000);
+            //GC.Collect();
 
 
 
@@ -253,28 +255,28 @@ namespace WinFormsTest
                     if (gh==null) continue;
                     stopwatch.Restart();
                     gh.Clear(System.Drawing.Color.White);
-                    //textFrame.PageMarginTop-=0.1F;
-                    Action<TextFrame> action = t =>
-                    {
-                        //if (!isBack) t.JumpToDisplay(jindu2+=0.01);
-                        //else t.JumpToDisplay(jindu2-=0.01);
+                    //textFrame.PageMarginTop=10.0F;
+                    //Action<TextFrame> action = t =>
+                    //{
+                    //    //if (!isBack) t.JumpToDisplay(jindu2+=0.01);
+                    //    //else t.JumpToDisplay(jindu2-=0.01);
 
-                        if(gunjindu>=0) t.JumpToDisplay(gunjindu);
-                        this.gunjindu=-1;
-                    };
-                    this.textFrame?.Invoke(action);
+                    //    if(gunjindu>=0) t.JumpToDisplay(gunjindu);
+                    //    this.gunjindu=-1;
+                    //};
+                    //this.textFrame?.Invoke(action);
 
                     textFrame?.Render();
                     textFrame?.CopyTo(bitmap);
 
                     gh.DrawImage(bitmap, 0, 0);
-                    var jindu = textFrame?.DisplayRange.End/(textFrame?.TextLength*1D)*100;
+                    //var jindu = textFrame?.DisplayRange.End/(textFrame?.TextLength*1D)*100;
                     TextRenderer.DrawText(gh, $"FPS:{Fps:N2}", textFont, Point.Empty, System.Drawing.Color.Black);
-                    TextRenderer.DrawText(gh, $"滚动进度:{jindu:N2}%", textFont, new Point(100, 0), System.Drawing.Color.Black);
-                    if (jindu>95)
-                    {
-                        isBack=true;
-                    }
+                    //TextRenderer.DrawText(gh, $"滚动进度:{jindu:N2}%", textFont, new Point(100, 0), System.Drawing.Color.Black);
+                    //if (jindu>95)
+                    //{
+                    //    isBack=true;
+                    //}
                     //TextRenderer.DrawText($"{}");
 
                     if (tickTime/10000.0>17)

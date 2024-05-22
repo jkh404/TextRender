@@ -1,16 +1,13 @@
 ﻿using System;
 using System.Buffers;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 using SkiaSharp;
 using TextRender.Abstracts;
 using TextRender.Command;
+using TextRender.Handles.Abstracts;
 namespace TextRender
 {
     /// <summary>
@@ -19,11 +16,12 @@ namespace TextRender
     public  partial class TextFrame : IBox,IDisposable
     {
 
-        public TextFrame(IGraphic graphic, int? width = null, int? height = null)
+        public TextFrame(IGraphic graphic,ITextProviderHandle textProvider, int? width = null, int? height = null)
         {
             if (graphic==null) throw new ArgumentNullException(nameof(graphic));
             if (width<0 || height<0) throw new ArgumentException("width and height must be greater than 0");
             _graphic=graphic;
+            this._textProvider=textProvider;
             _graphic.Resize(width??0, height??0);
         }
 
@@ -65,9 +63,10 @@ namespace TextRender
         protected  ConcurrentQueue<Action<TextFrame>> _actionQueue = new ConcurrentQueue<Action<TextFrame>>();
         protected TextRange _textDisplayRange;
         protected IGraphic _graphic;
+        protected ITextProviderHandle _textProvider;
         protected TextLineList _textLineList;
         
-        protected PinGCTextBuffer _pinGCTextBuffer;
+        //protected PinGCTextBuffer _pinGCTextBuffer;
         protected unsafe ReadOnlySpan<byte> ReadOnlyBytes
         {
             get
@@ -78,12 +77,12 @@ namespace TextRender
         protected unsafe Span<byte> Bytes => _graphic.Bytes;
         //protected IEnumerable<string> Lines => _lines.Select(r => Text[r.Range]);
 
-        protected ReadOnlySpan<char> Text=>_pinGCTextBuffer.Data;
+        //protected ReadOnlySpan<char> Text=>_pinGCTextBuffer.Data;
 
         /// <summary>
         /// 多余的文本
         /// </summary>
-        public ReadOnlySpan<char> SurplusText => Text[_surplusRange.AsRange()];
+        //public ReadOnlySpan<char> SurplusText => Text[_surplusRange.AsRange()];
         public int BytesSize => _graphic.BytesSize;
         public virtual int Width
         {
@@ -116,7 +115,7 @@ namespace TextRender
 
 
         public TextRange DisplayRange=>_textDisplayRange;
-        public int TextLength=>_pinGCTextBuffer?.BufferLength??0;
+        public long TextLength=> _textProvider.Count;
 
         public string CurrentFontkey
         {
@@ -225,8 +224,9 @@ namespace TextRender
         {
             Monitor.Enter(_lockAlloc);
             _graphic.Alloc();
-            _textLineList?.Dispose();
-            _textLineList =new TextLineList(_pinGCTextBuffer.Ptr, _pinGCTextBuffer.BufferLength);
+            //_textLineList?.Dispose();
+            //_textLineList =new TextLineList(_pinGCTextBuffer.Ptr, _pinGCTextBuffer.BufferLength);
+            //_textLineList =new TextLineList(this._textProvider);
             Monitor.Exit(_lockAlloc);
 
         }
@@ -234,8 +234,8 @@ namespace TextRender
         {
             Monitor.Enter(_lockAlloc);
             _graphic.Free();
-            _textLineList?.Dispose();
-            _textLineList=null;
+            //_textLineList?.Dispose();
+            //_textLineList=null;
             Monitor.Exit(_lockAlloc);
         }
         public void Resize(int w,int h)
@@ -261,80 +261,64 @@ namespace TextRender
         //{
         //    return FontDictionary.GetPaint(FontIndex);
         //}
-        private int _SetText(ReadOnlySpan<char> text, out TextRange surplusRange)
+        private long _SetText(TextRange textRange, out TextRange surplusRange)
         {
             lock (_lockSetText)
             {
                 surplusRange=new Range(0, 0);
-                if (text==null || text.Length<=0) return 0;
+                if (textRange.Length<=0) return 0;
 
                 if (_textLineList==null) return 0;
                 else _textLineList.Clear();
                 var start=this._textDisplayRange.Start;
-                int addCharCount = 0;
-                TextRange _tempRange = 0..text.Length;
-
-                var _start = _textDisplayRange.Start;
-                var addCount = 0;
+                long addCharCount = 0;
+                TextRange _tempRange = textRange;
+                long addCount = 0;
                 var fontInfo = _graphic.FontProvider.GetFontInfo(CurrentFontkey);
                 do
                 {
-                    addCount=AddLineText(text[addCharCount..text.Length], start+addCharCount, CurrentFontkey, out _tempRange);
+                    addCount=AddLineText(new TextRange(start+addCharCount, textRange.End), CurrentFontkey, out _tempRange);
                     if (_tempRange.Length<=0) break;
                     addCharCount+=addCount;
                     if(this.ContentHeight-_textLineList.Height<fontInfo.Size)break;
                 } while (addCount>0);
-
-                //for (int i = _lines.Count; i < LineCount; i++)
-                //{
-                //    var lastLineEndIndex = addCharCount;
-                //    addCharCount+=AddLineText(i, text[addCharCount..text.Length], out _tempRange, out var tempFatCharArray);
-                //    _lines.Add(((_start+lastLineEndIndex)..(_start+addCharCount), tempFatCharArray));
-                //    if ((_tempRange.End.Value-_tempRange.Start.Value)<=0)
-                //    {
-                //        break;
-                //    }
-
-                //}
                 _surplusRange=_tempRange;
                 return addCharCount;
             }
-            
-
         }
-        public int InitText(ReadOnlySpan<char> text)
+        public long InitText()
         {
             _initOk=false;
-            _pinGCTextBuffer=new PinGCTextBuffer(_lockTextBuffer, text);
-            _textDisplayRange=new Range(0, Text.Length);
             _textLineList?.Dispose();
-            _textLineList =new TextLineList(_pinGCTextBuffer.Ptr, _pinGCTextBuffer.BufferLength);
-            var result=FixupText();
+            _textLineList =new TextLineList(this._textProvider);
+
+            _textDisplayRange.SetStartAndEnd(0, this._textProvider.ByteCount);
+            var result = FixupText();
             _textDisplayRange.SetStartAndEnd(_textDisplayRange.Start, result);
             _initOk=true;
             return result;
         }
-        public void ReleaseText()
-        {
-            lock (_lockRender)
-            {
+        //public void ReleaseText()
+        //{
+        //    lock (_lockRender)
+        //    {
 
-                _pinGCTextBuffer?.Dispose();
-                _pinGCTextBuffer=null;
-            }
-        }
+        //        _pinGCTextBuffer?.Dispose();
+        //        _pinGCTextBuffer=null;
+        //    }
+        //}
         public bool MoveStartDisplay(int num)
         {
             if(num==0)return false;
-            var textLen = Text.Length;
-            var _start= Math.Min(Math.Max(0, _textDisplayRange.Start+num), textLen);
+            long textLen = _textProvider.ByteCount;
+            long _start = Math.Min(Math.Max(0, _textDisplayRange.Start+num), textLen);
             if(num<0 && _textDisplayRange.Start==0 && _start==0) return false;
-            var _end = Math.Min(textLen, _textDisplayRange.End+num);
+            long _end = Math.Min(textLen, _textDisplayRange.End+num);
             if (num>0 && _textDisplayRange.End==textLen && _end==_textDisplayRange.End) return false;
             //_start =Math.Max(0, _textDisplayRange.Start+num);
             _end=textLen;
             _textDisplayRange.SetStartAndEnd(_start, _end);
-            var result = FixupText();
+            long result = FixupText();
             _end=_start+result;
             _textDisplayRange.SetStartAndEnd(_start, _end);
             return true;
@@ -343,11 +327,11 @@ namespace TextRender
         {
             if (rate<0) rate=0;
             if(rate>1) rate=1;
-            var textLen = Text.Length;
-            var _start=Convert.ToInt32(Math.Ceiling(rate*textLen));
-            var _end=textLen;
+            long textLen = (int)_textProvider.Count;
+            long _start =Convert.ToInt32(Math.Ceiling(rate*textLen));
+            long _end =textLen;
             _textDisplayRange.SetStartAndEnd(_start, _end);
-            var result = FixupText();
+            long result = FixupText();
             _end=_start+result;
             _textDisplayRange.SetStartAndEnd(_start, _end);
             return true;
@@ -355,19 +339,19 @@ namespace TextRender
         public bool MoveLineDisplay(int LineCount)
         {
             if (LineCount==0) return false;
-            var dy = LineCount>0 ? 1 : -1;
+            int dy = LineCount>0 ? 1 : -1;
             LineCount=Math.Abs(LineCount);
             if (this._textLineList.Count>0 && dy>0)
             {
                 var dataLock = _textLineList.GetData();
                 try
                 {
-                    var lineCount = dataLock.Datas.Length;
+                    int lineCount = dataLock.Datas.Length;
                     LineCount= Math.Min(LineCount, lineCount);
-                    var aLLLen = 0;
+                    int aLLLen = 0;
                     for (int i = 0; i < LineCount; i++)
                     {
-                        var len = dataLock.Datas[i].Range.Length;
+                        int len = (int)dataLock.Datas[i].Range.Length;
                         _lineLenStack.Push(len);
                         aLLLen+=len;
                     }
@@ -390,9 +374,9 @@ namespace TextRender
                 var dataLock = _textLineList.GetData();
                 try
                 {
-                    var lineCount = dataLock.Datas.Length;
+                    int lineCount = dataLock.Datas.Length;
                     LineCount= Math.Min(LineCount, lineCount);
-                    var aLLLen = 0;
+                    int aLLLen = 0;
                     for (int i = 0; i <LineCount; i++)
                     {
                         _lineLenStack.TryPop(out var len);
@@ -431,7 +415,7 @@ namespace TextRender
             if (this._textLineList.Count>0 && num>0)
             {
                 using var dataLock = _textLineList.GetData();
-                var len = dataLock.Datas[0].Range.Length;
+                var len = (int)dataLock.Datas[0].Range.Length;
                 if (MoveStartDisplay(len))
                 {
                     _lineLenStack.Push(len);
@@ -455,12 +439,12 @@ namespace TextRender
             }
             return false;
         }
-        public void UpdateDisplayRange(int _start,int _end)
+        public void UpdateDisplayRange(long _start, long _end)
         {
-            if (_start>=0 && _end<=Text.Length)
+            if (_start>=0 && _end<=_textProvider.Count)
             {
                 _textDisplayRange.SetStartAndEnd(_start, _end);
-                var result = FixupText();
+                long result = FixupText();
                 _end=_start+result;
                 _textDisplayRange.SetStartAndEnd(_start, _end);
             }
@@ -473,37 +457,40 @@ namespace TextRender
         /// <summary>
         /// 重新排版
         /// </summary>
-        protected int FixupText()
+        protected long FixupText()
         {
-            return _SetText(Text[_textDisplayRange.AsRange()], out _surplusRange);
+            return _SetText(_textDisplayRange, out _surplusRange);
         }
-        private int AddLineText(ReadOnlySpan<char> text,int startOffset,string FontKey,out TextRange surplusRange)
+        private long AddLineText(TextRange textRange,string FontKey,out TextRange surplusRange)
         {
             surplusRange =new TextRange(0, 0);
 
-            if (text.Length<=0) return 0;
-
+            if (textRange.Length<=0) return 0;
+            var startOffset = textRange.Start;
             ref TextLine line=ref _textLineList.GenerateReturn();
             line.Range.Start=0; 
             line.Range.End=0;
             var contentWidth=ContentWidth;
-            var startIndex = 0;
-            var endIndex = text.Length-1;
-            var newLineIndex = text.IndexOf(Environment.NewLine);//查找第一个出现的换行符
+            int startIndex = 0;
+            long endIndex = textRange.Length-1;
+
+            int newLineIndex = (int)_textProvider.IndexOf(Environment.NewLine, textRange.Start, textRange.Length);//查找第一个出现的换行符
             if (newLineIndex>=0) endIndex=newLineIndex+NewLineLen;//存在则结束下标移动到换行符后面
             line.PageMaxWidth= contentWidth;//页面可以显示的最大内容宽度
             var fontInfo=_graphic.FontProvider.GetFontInfo(FontKey);
+            
             var fontSize = fontInfo.Size;
-            var charLength = endIndex;
+            var text=_textProvider.Slice(startOffset, (int)(endIndex-startOffset));
+            int charLength = text.Length;
             Span<byte> widthMultiple = stackalloc byte[charLength];
             int index = 0;
             float WideCharWidth = fontInfo.Spacing+fontSize;//宽字符宽度
             float NarrowCharWidth = fontInfo.Spacing+fontSize/2;//窄字符宽度
 
-            foreach (var charObj in text[0..(charLength)])
+            foreach (var charObj in text)
             {
                 
-                var width = _graphic.MeasureText(charObj, FontKey);
+                float width = _graphic.MeasureText(charObj, FontKey);
                 if (width/(fontSize/2)>1.0F)
                 {
                     //宽字符
@@ -539,77 +526,25 @@ namespace TextRender
                 index++;
                 if ((index >=endIndex || contentWidth<NarrowCharWidth)) break;
             }
-            endIndex=Math.Min(endIndex, index);
-            surplusRange =new TextRange(endIndex, text.Length);
+            var byteCount = _textProvider.Encoding.GetByteCount(text[0..index]);
+            endIndex=Math.Min(endIndex, startOffset+byteCount);
+            surplusRange =new TextRange(endIndex, textRange.End);
 
             line.Range.Start=startOffset+startIndex;//一行的范围
-            line.Range.End=startOffset+endIndex;
+            line.Range.End=endIndex;
             TextItem[] textItems = ArrayPool<TextItem>.Shared.Rent(1);
             textItems[0]._Range=line.Range;
             textItems[0].FontInfo=fontInfo;
-            textItems[0]._Source=_pinGCTextBuffer.Ptr;
-            textItems[0]._SourceLength=_pinGCTextBuffer.BufferLength;
+            textItems[0]._TextProvider=this._textProvider;
+            //textItems[0]._Source=_pinGCTextBuffer.Ptr;
+            //textItems[0]._SourceLength=_pinGCTextBuffer.BufferLength;
             textItems[0].FillWidthMultiple(widthMultiple);
             textItems[0].Update();
             line.FillItems(textItems.AsSpan(0,1));
             line.Update();
             ArrayPool<TextItem>.Shared.Return(textItems);
-            //var temp= line.Text;
-            //var temp_e0= line.Items[0].Text;
-            return endIndex;
-            //surplusRange =new Range(0,0);
-            //isFatCharArray=null;
-            //if (text.Length<=0) return 0;
-            //ReadOnlySpan<char> _temp;
-            //var endIndex = text.Length-1;
-            //var newLineIndex = text.IndexOf(Environment.NewLine);
-            //if (newLineIndex>=0) endIndex=newLineIndex+NewLineLen;
-            //var contentWidth = ContentWidth;
-            //var startIndex = 0;
-            //isFatCharArray=ArrayPool<byte>.Shared.Rent(endIndex);
-            //for (startIndex = 0; startIndex <endIndex; startIndex++)
-            //{
-            //    _temp=text[startIndex..(startIndex+1)];
-            //    var width = _graphic.MeasureText(_temp);
-            //    if (width/(FontSize/2)>1.0F)
-            //    {
-            //        //宽字符
-            //        if (contentWidth>=DCharWidth)
-            //        {
-            //            isFatCharArray[startIndex]=2;
-            //            contentWidth-=width;
-            //        }
-            //        else
-            //        {
-            //            startIndex=Math.Max(0, startIndex-1);
-            //            break;
-            //        }
-
-            //    }
-            //    else if (width>0)
-            //    {
-            //        //窄字符
-            //        if (contentWidth>=CharWidth)
-            //        {
-            //            isFatCharArray[startIndex]=(1);
-            //            contentWidth-=width;
-            //        }
-            //        else
-            //        {
-            //            startIndex=Math.Max(0, startIndex-1);
-            //            break;
-            //        }
-            //    }
-            //    else
-            //    {
-            //        isFatCharArray[startIndex]=(0);
-            //    }
-
-            //    if ((startIndex >=endIndex || contentWidth<CharWidth)) break;
-            //}
-            //endIndex=startIndex;
-            //surplusRange =new Range(endIndex,text.Length);
-            //return endIndex;
+            return endIndex-startOffset;
+            
         }
         private readonly Task[] _invokeTask=new Task[100];
         private SKTextBlob _currentSKTextBlob;
@@ -624,8 +559,8 @@ namespace TextRender
                     //{
                     //    Debug.WriteLine("执行超时");
                     //},null,1000,1000);
-                    var queueCount = _actionQueue.Count;
-                    var len = Math.Min(_invokeTask.Length, queueCount);
+                    int queueCount = _actionQueue.Count;
+                    int len = Math.Min(_invokeTask.Length, queueCount);
                     do
                     {
                         for (int tIndex = 0; tIndex < len; tIndex++)
@@ -667,6 +602,7 @@ namespace TextRender
 
                 if (NextFixupText)
                 {
+                    //var t=this._textProvider.Slice(this._textDisplayRange);
                     FixupText();
                     _nextFixupText = false;
                 }
@@ -688,16 +624,27 @@ namespace TextRender
                     {
                         x+=item.Margin.Left;
                         //_graphic?.DrawText();
+                        //for (int i = 0; i < item.Text.Length; i++)
+                        //{
+                        //    var c= item.Text[i];
+                        //    int dx=item.GetCharWidthIndex(i);
+                        //    _graphic?.DrawText(c, x, y, CurrentFontkey);
+                        //    x+=dx;
+                        //}
+
+                        _graphic.DrawText(item.Text, x, y, CurrentFontkey);
+
                         for (int i = 0; i < item.Text.Length; i++)
                         {
-                            var c= item.Text[i];
-                            var dx=item.GetCharWidthIndex(i);
-                            _graphic?.DrawText(c, x, y, CurrentFontkey);
+                            //var c = item.Text[i];
+                            int dx = item.GetCharWidthIndex(i);
+                            //_graphic?.DrawText(c, x, y, CurrentFontkey);
                             x+=dx;
                         }
                         
+
                     }
-                    
+
                 }
 
                 //for (int i = 0; i < LineCount && i<_lines.Count; i++)
@@ -742,7 +689,7 @@ namespace TextRender
             range=new Range(0,0);
             if (target==null || target.Length<=0) return true;
             Monitor.Enter(_lockAlloc);
-            var size = Math.Min(target.Length, BytesSize);
+            int size = Math.Min(target.Length, BytesSize);
             range=new Range(0, size);
             Bytes[range].CopyTo(target);
             Monitor.Exit(_lockAlloc);
@@ -751,7 +698,8 @@ namespace TextRender
         public void Dispose()
         {
             _graphic?.Dispose();
-            _pinGCTextBuffer?.Dispose();
+            _textProvider?.Dispose();
+            //_pinGCTextBuffer?.Dispose();
         }
 
         

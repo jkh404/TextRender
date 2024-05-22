@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -50,6 +51,50 @@ namespace TextRender
             {
                 throw new ArgumentOutOfRangeException();
             }
+        }
+
+        public static int IndexOfALL<T>(this ReadOnlySpan<T> values, ReadOnlySpan<T> searchValue, List<long> result, long start=0) where T: IEquatable<T>
+        {
+            List<long> indexs = result;
+            int index = 0;
+            int i = 0;
+            int count = 0;
+            int searchValueLength = searchValue.Length;
+            do
+            {
+                i=values.IndexOf(searchValue);
+                if (i>=0)
+                {
+                    index+=i;
+                    indexs.Add(start+index);
+                    if (i+searchValueLength>values.Length) break;
+                    values=values[(i+searchValueLength)..];
+                    count++;
+                }
+            } while (i>=0);
+            return count;
+        }
+        public static int IndexOfALL<T>(this Span<T> values, Span<T> searchValue, List<long> result, long start = 0) where T : IEquatable<T>
+        {
+            List<long> indexs = result;
+            int index = 0;
+            int i = 0;
+            int searchValueLength = searchValue.Length;
+            int count = 0;
+            do
+            {
+                i=values.IndexOf(searchValue);
+                if (i>=0)
+                {
+                    index+=i;
+                    indexs.Add(start+index);
+                    if (i+searchValueLength>values.Length) break;
+                    values=values[(i+searchValueLength)..];
+                    index+=searchValueLength;
+                    count++;
+                }
+            } while (i>=0);
+            return count;
         }
     }
 }

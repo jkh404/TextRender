@@ -26,6 +26,11 @@ namespace TextRender.SkiaSharpRender
             var paint= _fontProvider.GetPaint(fontKey??CurrentFontKey);
             return paint.MeasureText(text);
         }
+        public float MeasureText(ReadOnlySpan<byte> text, string? fontKey = null)
+        {
+            var paint = _fontProvider.GetPaint(fontKey??CurrentFontKey);
+            return paint.MeasureText(text);
+        }
         public float MeasureText(char c, string? fontKey = null)
         {
             var paint = _fontProvider.GetPaint(fontKey??CurrentFontKey);
@@ -61,7 +66,19 @@ namespace TextRender.SkiaSharpRender
             Monitor.Exit(_lockAlloc);
             Monitor.Exit(_lockResize);
         }
-
+        public void DrawText(ReadOnlySpan<byte> text, float X = 0, float Y = 0, string? fontKey = null)
+        {
+            Monitor.Enter(_lockResize);
+            Monitor.Enter(_lockAlloc);
+            fontKey??=CurrentFontKey;
+            var font = _fontProvider.GetFont(fontKey);
+            var paint = _fontProvider.GetPaint(fontKey);
+            if (font==null) throw new ArgumentException(nameof(fontKey));
+            if (paint==null) throw new ArgumentException(nameof(fontKey));
+            _canvas?.DrawText_NoGC(_textBlobBuilder.Handle, text, X, Y, paint, font);
+            Monitor.Exit(_lockAlloc);
+            Monitor.Exit(_lockResize);
+        }
         public void Clear(uint? color = null)
         {
             var _color = ToColor(color??_backgroundColor);

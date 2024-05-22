@@ -25,24 +25,13 @@ namespace TextRender.Handles
             if(buffer==null)throw new ArgumentNullException(nameof(buffer));
             if(length>buffer.Length)throw new ArgumentOutOfRangeException(nameof(length));
             var maxLength = int.MaxValue-10240;
-            length=Math.Min((int)(_stream.Length-start), buffer.Length);
-            if (start>=maxLength)
+            length=(int)Math.Min((_stream.Length-start), buffer.Length);
+            lock (_lockReadWrite)
             {
-                lock (_lockReadWrite)
-                {
-                    _stream.Seek(start, SeekOrigin.Begin);
-                    _stream.Read(buffer, 0, length);
-                    _stream.Seek(0, SeekOrigin.Begin);
-                    return length;
-                }
-            }
-            else
-            {
-                lock (_lockReadWrite)
-                {
-                    _stream.Read(buffer,(int)start,length);
-                    return length;
-                }
+                _stream.Seek(start, SeekOrigin.Begin);
+                _stream.Read(buffer, 0, length);
+                _stream.Seek(0, SeekOrigin.Begin);
+                return length;
             }
         }
         public long Write(byte[] buffer, long start, int length)
@@ -50,24 +39,13 @@ namespace TextRender.Handles
             if (buffer==null) throw new ArgumentNullException(nameof(buffer));
             if (length>buffer.Length) throw new ArgumentOutOfRangeException(nameof(length));
             var maxLength = int.MaxValue-10240;
-            length=Math.Min((int)(_stream.Length-start), buffer.Length);
-            if (start>=maxLength)
+            length=(int)Math.Min((_stream.Length-start), buffer.Length);
+            lock (_lockReadWrite)
             {
-                lock (_lockReadWrite)
-                {
-                    _stream.Seek(start, SeekOrigin.Begin);
-                    _stream.Write(buffer, 0, length);
-                    _stream.Seek(0, SeekOrigin.Begin);
-                    return length;
-                }
-            }
-            else
-            {
-                lock (_lockReadWrite)
-                {
-                    _stream.Write(buffer, (int)start, length);
-                    return length;
-                }
+                _stream.Seek(start, SeekOrigin.Begin);
+                _stream.Write(buffer, 0, length);
+                _stream.Seek(0, SeekOrigin.Begin);
+                return length;
             }
         }
         public int Read(Span<byte> buffer)

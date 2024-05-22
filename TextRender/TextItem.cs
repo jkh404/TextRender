@@ -2,12 +2,14 @@
 using System.Buffers;
 using System.Numerics;
 using TextRender.Command;
+using TextRender.Handles.Abstracts;
 namespace TextRender
 {
     public struct TextItem : IDisposable
     {
-        internal IntPtr _Source;
-        internal int _SourceLength;
+        //internal IntPtr _Source;
+        //internal int _SourceLength;
+        internal ITextProviderHandle _TextProvider;
         internal TextRange _Range;
         internal float _ContentWidth;
         public BoxSpacing _Margin;
@@ -18,16 +20,16 @@ namespace TextRender
         public byte[] Bitmap;
         public int BitmapWidth;
         internal unsafe TextItem(
-            IntPtr source,
-            int sourceLength,
+            ITextProviderHandle textProvider,
             TextRange textRange,
             BoxSpacing margin,
             FontInfo fontInfo,
             ReadOnlySpan<byte> widthMultiple, byte[] bitmap, int bitmapWidth)
         {
-            _Source=source;
-            _SourceLength=sourceLength;
-            _Range=textRange;
+            //_Source=source;
+            //_SourceLength=sourceLength;
+            _TextProvider=textProvider;
+            _Range =textRange;
             _Margin=margin;
             FontInfo=fontInfo;
             Bitmap=bitmap;
@@ -40,9 +42,10 @@ namespace TextRender
             _ContentWidth =GetContentWidth();
         }
 
-        private unsafe Span<char> SourceText => new Span<char>((void*)_Source, _SourceLength);
-        private unsafe ReadOnlySpan<char> ReadOnlySourceText => SourceText;
-        public unsafe ReadOnlySpan<char> Text => ReadOnlySourceText[_Range.AsRange()];
+        //private unsafe Span<char> SourceText => new Span<char>((void*)_Source, _SourceLength);
+        //private unsafe ReadOnlySpan<char> ReadOnlySourceText => SourceText;
+        public  ReadOnlySpan<char> Text => _TextProvider.Slice(Range);
+        public  ReadOnlySpan<byte> TextBtyes => _TextProvider.SliceByte(Range);
         public BoxSpacing Margin => _Margin;
         public TextRange Range => _Range;
         public float FontSize => FontInfo.Size;

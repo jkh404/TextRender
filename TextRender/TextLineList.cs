@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Buffers;
 using System.Threading;
+using TextRender.Handles.Abstracts;
 namespace TextRender
 {
     public class TextLineList:IDisposable
@@ -9,12 +10,12 @@ namespace TextRender
         private int _capacity = 32;
         private int _count = 0;
         private TextLine[] _textLines;
-        private IntPtr _source;
-        private int _sourceLength;
-        public TextLineList(IntPtr source,int sourceLength)
+        private ITextProviderHandle _textProvider;
+        //private IntPtr _source;
+        //private int _sourceLength;
+        public TextLineList(ITextProviderHandle textProvider)
         {
-            _source = source;
-            _sourceLength = sourceLength;
+            _textProvider=textProvider;
             _textLines =ArrayPool<TextLine>.Shared.Rent(_capacity);
         }
         private Span<TextLine> TextLines => _textLines.AsSpan(0, _count);
@@ -93,7 +94,8 @@ namespace TextRender
                     _textLines=_tempTextLines;
                 }
                 ref TextLine TextLine = ref _textLines[_count++];
-                TextLine.Init(_source, _sourceLength);
+                //TextLine.Init(_source, _sourceLength);
+                TextLine.Init(_textProvider);
                 return ref TextLine;
             }
             finally
