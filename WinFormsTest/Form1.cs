@@ -20,9 +20,9 @@ namespace WinFormsTest
 
         private int width = 1920;
         private int height = 1080;
-        //private readonly string filePath = "《恶灵国度》作者：弹指一笑间0.txt";
+        private readonly string filePath = "《恶灵国度》作者：弹指一笑间0.txt";
         //private readonly string filePath = "《恶灵国度》作者：弹指一笑间0_make.txt";
-        private readonly string filePath = "big.txt";
+        //private readonly string filePath = "big.txt";
 
         //private readonly string text;
         private object renderLockObj = new object();
@@ -117,7 +117,7 @@ namespace WinFormsTest
                     Spacing=0
                 }, item);
             }
-            textFrame.CurrentFontkey=FamilyNames[0];
+            textFrame.CurrentFontkey=FamilyNames[4];
             textFrame.PageMarginLeft=0;
             textFrame.PageMarginTop=10;
             textFrame.PageMarginBottom=10;

@@ -23,20 +23,20 @@ namespace TextRender.SkiaSharpRender
         }
         public float MeasureText(ReadOnlySpan<char> text, string? fontKey = null)
         {
-            var paint= _fontProvider.GetPaint(fontKey??CurrentFontKey);
-            return paint.MeasureText(text);
+            var font = _fontProvider.GetFont(fontKey ?? CurrentFontKey);
+            return font.MeasureText(text);
         }
         public float MeasureText(ReadOnlySpan<byte> text, string? fontKey = null)
         {
-            var paint = _fontProvider.GetPaint(fontKey??CurrentFontKey);
-            return paint.MeasureText(text);
+            var font = _fontProvider.GetFont(fontKey ?? CurrentFontKey);
+            return font.MeasureText(text,SKTextEncoding.Utf16);
         }
         public float MeasureText(char c, string? fontKey = null)
         {
-            var paint = _fontProvider.GetPaint(fontKey??CurrentFontKey);
+            var font=_fontProvider.GetFont(fontKey??CurrentFontKey);
             Span<char> chars=stackalloc char[1];
             chars[0]=c;
-            return paint.MeasureText(chars);
+            return font.MeasureText(chars);
         }
         public void DrawText(char c, float X = 0, float Y = 0, string? fontKey = null)
         {

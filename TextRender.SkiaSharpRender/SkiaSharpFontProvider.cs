@@ -115,7 +115,7 @@ namespace TextRender.SkiaSharpRender
             var font = GetFont(fontKey);
             var paint = GetPaint(fontKey);
             font.Size=fontSize;
-            paint.TextSize=fontSize;
+            //paint.TextSize=fontSize;
         }
 
         public bool ContainsKey(string fontKey)
@@ -175,17 +175,20 @@ namespace TextRender.SkiaSharpRender
 
             font?.Typeface?.Dispose();
             font?.Dispose();
-            paint?.Typeface?.Dispose();
+            //paint?.Typeface?.Dispose();
             paint?.Dispose();
 
             font=new SKFont(SKTypeface.FromFamilyName(newFontInfo.FamilyName), newFontInfo.Size, newFontInfo.ScaleX, newFontInfo.SkewX);
             font.Embolden=newFontInfo.Embolden;
             paint=new SKPaint(font);
             paint.Color=_colorParse.ToColor(newFontInfo.Color);
+            
             paint.TextAlign=(SKTextAlign)newFontInfo.Align;
+            
             paint.IsAntialias=newFontInfo.IsAntialias;
-            paint.IsAutohinted=newFontInfo.IsAutohinted;
-            paint.IsLinearText=newFontInfo.IsLinearText;
+
+            font.ForceAutoHinting=newFontInfo.IsAutohinted;
+            font.LinearMetrics= newFontInfo.IsLinearText;
             paint.IsStroke=newFontInfo.IsStroke;
             paint.Style=SKPaintStyle.Fill;
 
